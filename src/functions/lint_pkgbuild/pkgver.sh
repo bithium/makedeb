@@ -32,28 +32,42 @@ lint_pkgbuild_functions+=('lint_pkgver')
 check_pkgver() {
 	local ret=0
 	local ver=$1
-	local type=$2
+	local epoch=$2
+	local rel=$3
+	local type=$4
+
+	if [[ $# -lt 3 ]]; then
+		error "$(gettext "missing arguments for %s.")" "${FUNCNAME[0]}"
+		return 1
+	fi
 
 	if [[ -z $ver ]]; then
 		error "$(gettext "%s is not allowed to be empty.")" "pkgver${type:+ in $type}"
 		return 1
 	fi
 
-    invalid_characters="$(echo "${ver}" | sed 's|[a-z0-9.+~]||g')"
-
-    if [[ "${invalid_characters:+x}" == "x" ]]; then
-	    error "$(gettext "%s contains invalid characters.")" "pkgver${type:+ in $type}"
-	    ret=1
+    if ! echo "${ver:0:1}" | grep -q '[0-9]'; then
+        error "$(gettext "%s doesn't start with a digit.")" "pkgver${type:+ in $type}"
+        ret=1
     fi
 
-    if ! echo "${pkgver:0:1}" | grep -q '[0-9]'; then
-	    error "$(gettext "%s doesn't start with a digit.")" "pkgver${type:+ in $type}"
-	    ret=1
+    local invalid_characters='a-z0-9.+~'
+    if [[ -n "$epoch" ]]; then
+        invalid_characters="${invalid_characters}:"
+    fi
+    if [[ -n "$rel" ]]; then
+        invalid_characters="${invalid_characters}-"
+    fi
+
+    local has_invalid_chars=${ver//[$invalid_characters]/}
+    if [[ "${has_invalid_chars:+x}" == "x" ]]; then
+        error "$(gettext "%s contains invalid characters.")" "pkgver${type:+ in $type}"
+        ret=1
     fi
 
     return "${ret}"
 }
 
 lint_pkgver() {
-	check_pkgver "$pkgver"
+	check_pkgver "$pkgver" "$epoch" "$pkgrel"
 }

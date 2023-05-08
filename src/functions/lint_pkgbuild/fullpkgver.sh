@@ -31,6 +31,8 @@ source "$LIBRARY/lint_pkgbuild/pkgver.sh"
 check_fullpkgver() {
 	local fullver=$1 type=$2
 	local ret=0
+	local epoch='';
+	local pkgrel='';
 
 	# If there are multiple colons or multiple hyphens, there's a
 	# question of how we split it--it's invalid either way, but it
@@ -38,7 +40,8 @@ check_fullpkgver() {
 
 	if [[ $fullver = *:* ]]; then
 		# split at the *first* colon
-		check_epoch "${fullver%%:*}" "$type" || ret=1
+		epoch=${fullver%%:*}
+		check_epoch "$epoch" "$type" || ret=1
 		fullver=${fullver#*:}
 	fi
 
@@ -48,11 +51,12 @@ check_fullpkgver() {
 	# to be empty".
 	if [[ $fullver = ?*-* ]]; then
 		# split at the *last* hyphen
-		check_pkgrel "${fullver##*-}" "$type" || ret=1
+		pkgrel=${fullver##*-}
+		check_pkgrel "${pkgrel}" "$type" || ret=1
 		fullver=${fullver%-*}
 	fi
 
-	check_pkgver "$fullver" "$type" || ret=1
+	check_pkgver "$fullver" "$epoch" "$pkgrel" "$type" || ret=1
 
 	return $ret
 }

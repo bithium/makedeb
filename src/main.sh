@@ -231,7 +231,7 @@ update_pkgver() {
 	if (( $? != 0 )); then
 		error_function pkgver
 	fi
-	if ! check_pkgver "$newpkgver"; then
+	if ! check_pkgver "$newpkgver" "${pkg_epoch}" "${pkg_pkgrel}"; then
 		error "$(gettext "pkgver() generated an invalid version: %s")" "$newpkgver"
 		exit $E_PKGBUILD_ERROR
 	fi

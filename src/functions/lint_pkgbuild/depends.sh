@@ -113,7 +113,7 @@ lint_deps() {
 						check_epoch "${pkg_epoch}" "${k}" || ret=1
 					fi
 
-					check_pkgver "${pkg_pkgver}" "${k}" || ret=1
+					check_pkgver "${pkg_pkgver}" "${pkg_epoch}" "${pkg_pkgrel}" "${k}" || ret=1
 
 					if [[ "${pkg_pkgrel:+x}" == "x" ]]; then
 						check_pkgrel "${pkg_pkgrel}" "${k}" || ret=1
