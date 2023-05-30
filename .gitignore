@@ -7,3 +7,7 @@ test/tests/test_dir
 src/PKGBUILD
 src/src/
 src/pkg/
+src/*.deb
+target/
+test/wip.bats
+packages

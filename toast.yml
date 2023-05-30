@@ -1,5 +1,6 @@
 ---
 image: ubuntu:22.04
+default: run_unit_tests
 command_prefix: |
   # Make Bash not silently ignore errors.
   set -euo pipefail
@@ -58,12 +59,41 @@ tasks:
     command: |
       git config --global --add safe.directory /scratch
 
-      export VERSION=$(git describe)
+      export VERSION=$(git describe --tags)
       export BUILD_COMMIT=$(git rev-parse HEAD)
       make prepare
       make package
 
       sudo rsync -rp "${DESTDIR}/" /
+
+  create_deb:
+    description: Create deb for makedeb
+    user: makedeb
+    dependencies:
+      - build
+    input_paths:
+      - .git/
+      - .data.json
+      - completions/
+      - src/
+      - man/
+      - PKGBUILD/
+    output_paths:
+      - packages
+    environment:
+      TARGET: apt
+      DPKG_ARCHITECTURE: amd64
+      RELEASE: stable
+    command: |
+      mkdir packages deb
+      git config --global --add safe.directory /scratch
+      export VERSION=$(git describe --tags)
+      export BUILD_COMMIT=$(git rev-parse HEAD)
+
+      ## Build makedeb.
+      PKGBUILD/pkgbuild.sh > deb/PKGBUILD
+      (cd deb && makedeb -s --no-confirm)
+      mv deb/makedeb*.deb packages/
 
   run_unit_tests:
     description: Run unit tests.
