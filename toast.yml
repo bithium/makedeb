@@ -1,21 +1,86 @@
-image: proget.hunterwittenborn.com/docker/makedeb/makedeb:ubuntu-jammy
-user: makedeb
-location: /home/makedeb/makedeb
-command_prefix: set -e
+---
+image: ubuntu:22.04
+command_prefix: |
+  # Make Bash not silently ignore errors.
+  set -euo pipefail
+
+  export DEBIAN_FRONTEND=noninteractive
+
 tasks:
   install_dependencies:
-    description: Install needed dependencies.
+    description: Install needed dependencies
+    user: root
     input_paths:
-      - .drone/scripts/install-deps.sh
-    command: .drone/scripts/install-deps.sh
+      - PKGBUILD/TEMPLATE.PKGBUILD
+    command: |
+      sed -e "s|{{.\+}}||g" \
+        PKGBUILD/TEMPLATE.PKGBUILD > PKGBUILD/PKGBUILD
+
+      source PKGBUILD/PKGBUILD
+
+      apt-get update
+      apt-get install -y curl rsync bats make apt-utils parallel \
+        ${depends[*]} ${makedepends[*]}
+
+      git clone --depth 1 --branch v1.9.0 https://github.com/bats-core/bats-core.git
+      pushd bats-core
+      ./install.sh /usr/local
+
+  setup_user:
+    description: Install needed dependencies
+    user: root
+    command: |
+      apt-get update
+      apt-get install -y sudo
+      useradd -m makedeb -s /bin/bash
+      echo 'makedeb ALL=(ALL:ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+  build:
+    description: Build and install `makedeb`
+    user: makedeb
+    dependencies:
+      - install_dependencies
+      - setup_user
+    input_paths:
+      - .git/
+      - completions/
+      - src/
+      - man/
+      - Makefile
+    excluded_input_paths:
+      - test/
+      - toast.yml
+    environment:
+      TARGET: apt
+      DPKG_ARCHITECTURE: amd64
+      DESTDIR: /scratch/pkg
+      RELEASE: stable
+    command: |
+      git config --global --add safe.directory /scratch
+
+      export VERSION=$(git describe)
+      export BUILD_COMMIT=$(git rev-parse HEAD)
+      make prepare
+      make package
+
+      sudo rsync -rp "${DESTDIR}/" /
 
   run_unit_tests:
     description: Run unit tests.
+    dependencies:
+      - build
+    user: makedeb
     environment:
-      TESTS: "./"
+      WIP: 0
+      TESTS: "./tests"
+      BATS_SUDO_OVERRIDE: 1
+    cache: false
     input_paths:
-      - ./
+      - test
     command: |
-      sudo chown 'makedeb:makedeb' "${HOME}/makedeb" -R
-      git remote set-url origin 'https://github.com/makedeb/makedeb'
-      release_type=alpha .drone/scripts/run-unit-tests.sh
+      if [[ "$WIP" != "0" ]]; then
+        bats --filter-tags wip test/${TESTS}
+      else
+        bats -j $(nproc) --filter-tags lint test/${TESTS}
+        bats --filter-tags !lint test/${TESTS}
+      fi
